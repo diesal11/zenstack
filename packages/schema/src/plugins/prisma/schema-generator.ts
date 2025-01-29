@@ -528,6 +528,7 @@ export class PrismaSchemaGenerator {
                 );
                 if (found) {
                     // replicate the attribute and replace the field reference with the new FK field
+                    let name = "";
                     const args: PrismaAttributeArgValue[] = [];
                     for (const arg of fields.items) {
                         if (isReferenceExpr(arg) && arg.target.ref === origForeignKey) {
@@ -538,6 +539,7 @@ export class PrismaSchemaGenerator {
                                     new PrismaFieldReference(addedFkField.name)
                                 )
                             );
+                            name += `${name.length > 0 ? '_' : ''}${addedFkField.name}`
                         } else {
                             // copy
                             args.push(
@@ -546,11 +548,15 @@ export class PrismaSchemaGenerator {
                                     new PrismaFieldReference((arg as ReferenceExpr).target.$refText)
                                 )
                             );
+                            name += `${name.length > 0 ? '_' : ''}${(arg as ReferenceExpr).target.$refText}`
                         }
                     }
 
+                    const constraintName = `${truncate(name)}_unique`;
+
                     model.addAttribute('@@unique', [
                         new PrismaAttributeArg(undefined, new PrismaAttributeArgValue('Array', args)),
+                        new PrismaAttributeArg('map', new PrismaAttributeArgValue('String', constraintName)),
                     ]);
                 }
             }
