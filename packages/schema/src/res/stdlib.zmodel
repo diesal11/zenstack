@@ -246,6 +246,8 @@ attribute @id(map: String?, length: Int?, sort: SortOrder?, clustered: Boolean?)
  */
 attribute @default(_ value: ContextType, map: String?) @@@prisma @@@supportTypeDef
 
+attribute @readOnly()
+
 /**
  * Defines a unique constraint for this field.
  *

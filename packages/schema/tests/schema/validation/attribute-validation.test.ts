@@ -1391,4 +1391,26 @@ describe('Attribute tests', () => {
         `)
         ).resolves.toContain('Invalid regular expression');
     });
+
+    it('Only allows @readOnly on fields with @default', async () => {
+        await expect(
+            loadModelWithError(`
+            ${prelude}
+            model User {
+                id String @id @readOnly
+            }
+        `)
+        ).resolves.toContain('attribute "@readOnly" can only be used on fields with a @default attribute');
+    });
+
+    it('Doesnt allow @readOnly on TypeDef models', async () => {
+        await expect(
+            loadModelWithError(`
+            ${prelude}
+            type User {
+                id String @id @readOnly
+            }
+        `)
+        ).resolves.toContain('attribute "@readOnly" can only be used on data model fields');
+    });
 });

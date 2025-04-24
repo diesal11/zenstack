@@ -69,6 +69,11 @@ export class EnhancerGenerator {
     // Regex patterns for matching input/output types for models with JSON type fields
     private readonly modelsWithJsonTypeFieldsInputOutputPattern: RegExp[];
 
+    // models with @readOnly fields
+    private readonly modelsWithReadOnlyFields: DataModel[];
+
+    private readonly modelsWithReadOnlyFieldsInputPatterns: RegExp[];
+
     // a mapping from shortened names to full names
     private reversedShortNameMap = new Map<string, string>();
 
@@ -90,6 +95,19 @@ export class EnhancerGenerator {
             (d): d is DataModel => isDataModel(d) && d.fields.some((f) => isTypeDef(f.type.reference?.ref))
         );
 
+        this.modelsWithReadOnlyFields = this.model.declarations.filter(
+            (d): d is DataModel => isDataModel(d) && d.fields.some((f) => hasAttribute(f, '@readOnly'))
+        );
+
+        const modelsWithReadOnlyFieldsRegex = this.modelsWithReadOnlyFields.map((m) => m.name).join('|');
+
+        this.modelsWithReadOnlyFieldsInputPatterns = [
+            new RegExp(`^(${modelsWithReadOnlyFieldsRegex})(Unchecked)?Create(\\S+?)?Input$`),
+            new RegExp(`^(${modelsWithReadOnlyFieldsRegex})(Unchecked)?Update(\\S+?)?Input$`),
+            new RegExp(`^(${modelsWithReadOnlyFieldsRegex})CreateManyInput$`),
+            new RegExp(`^(${modelsWithReadOnlyFieldsRegex})(Unchecked)?UpdateMany(Mutation)?Input$`),
+        ];
+
         // input/output patterns for models with json type fields
         const relevantTypePatterns = [
             'GroupByOutputType',
@@ -98,6 +116,7 @@ export class EnhancerGenerator {
             'CreateManyInput',
             '(Unchecked)?UpdateMany(Mutation)?Input',
         ];
+
         // build combination regex with all models with JSON types and the above suffixes
         this.modelsWithJsonTypeFieldsInputOutputPattern = this.modelsWithJsonTypeFields.map(
             (m) => new RegExp(`^(${m.name})(${relevantTypePatterns.join('|')})$`)
@@ -607,6 +626,9 @@ export type Enhanced<Client> =
         // remove aux fields
         source = this.removeAuxFieldsFromTypeAlias(typeAlias, source);
 
+        // remove read-only fields from Create/Update input types
+        source = this.removeReadOnlyFieldsFromTypeAlias(typeAlias, source);
+
         // remove discriminator field from concrete input types
         source = this.removeDiscriminatorFromConcreteInput(typeAlias, delegateInfo, source);
 
@@ -714,6 +736,38 @@ export type Enhanced<Client> =
                 source = this.removeFromSource(source, d.getText());
             });
         }
+        return source;
+    }
+
+    private removeReadOnlyFieldsFromTypeAlias(typeAlias: TypeAliasDeclaration, source: string) {
+        const typeName = typeAlias.getName();
+
+        const getReadOnlyFields = (model: DataModel) => {
+            return model.fields.filter((f) => isTypeDef(f.type.reference?.ref));
+        };
+
+        const removeField = (field: DataModelField) => {
+            return source.replace(new RegExp(`(${field.name}\\??\\s*):[^\\n]+`), '');
+        };
+
+        // fix input types, "[Model]CreateInput", etc.
+        for (const pattern of this.modelsWithReadOnlyFieldsInputPatterns) {
+            const match = typeName.match(pattern);
+            if (!match) {
+                continue;
+            }
+            // first capture group is the model name
+            const modelName = this.resolveName(match[1]);
+            const model = this.modelsWithJsonTypeFields.find((m) => m.name === modelName);
+            const fieldsToRemove = getReadOnlyFields(model!);
+            for (const field of fieldsToRemove) {
+                source = removeField(field);
+            }
+
+            this.trimEmptyLines(source);
+            break;
+        }
+
         return source;
     }
 

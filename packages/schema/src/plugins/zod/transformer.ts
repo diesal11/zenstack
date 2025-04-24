@@ -151,6 +151,14 @@ export default class Transformer {
                     });
                 }
 
+                // remove @readOnly fields from create/update input schemas
+                const readOnlyFields = contextDataModel.fields.filter((f) => hasAttribute(f, '@readOnly'));
+                if (readOnlyFields.length > 0) {
+                    fields = fields.filter((field) => {
+                        return !readOnlyFields.some((readOnlyField) => readOnlyField.name === field.name);
+                    });
+                }
+
                 // import type-def's schemas
                 const typeDefFields = contextDataModel.fields.filter((f) => isTypeDef(f.type.reference?.ref));
                 typeDefFields.forEach((field) => {

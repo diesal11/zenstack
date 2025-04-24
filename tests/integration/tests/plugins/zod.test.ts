@@ -1121,4 +1121,33 @@ describe('Zod plugin tests', () => {
         // Ensure Zod Schemas correctly mark @default fields as optional
         expect(zodSchemas.objects.BarCreateInputObjectSchema.safeParse({}).success).toBeTruthy();
     });
+
+    it('@readOnly fields should be omitted in create/update', async () => {
+        const { zodSchemas } = await loadSchema(
+            `
+            model User {
+                id Int @id @default(autoincrement()) @readOnly
+                email String @unique
+                createdAt DateTime @default(now()) @readOnly
+            }
+            `,
+            {
+                fullZod: true,
+                provider: 'postgresql',
+                pushDb: false,
+            }
+        );
+
+        // Ensure Zod Schemas correctly omit @readOnly fields in create/update
+        expect(
+            zodSchemas.input.UserInputSchema.create.safeParse({ data: { email: 'aaa@bb.com' } }).success
+        ).toBeTruthy();
+        expect(
+            zodSchemas.input.UserInputSchema.create.safeParse({ data: { id: 1, email: 'aaa@bbb.com' } }).success
+        ).toBeFalsy();
+        expect(
+            zodSchemas.input.UserInputSchema.create.safeParse({ data: { createdAt: new Date(), email: 'aaa@bbb.com' } })
+                .success
+        ).toBeFalsy();
+    });
 });

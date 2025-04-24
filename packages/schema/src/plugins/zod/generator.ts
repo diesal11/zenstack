@@ -245,6 +245,7 @@ export class ZodSchemaGenerator {
         for (let i = 0; i < inputObjectTypes.length; i += 1) {
             // exclude delegate aux fields
             const fields = inputObjectTypes[i]?.fields?.filter((f) => !f.name.includes(DELEGATE_AUX_RELATION_PREFIX));
+
             const name = inputObjectTypes[i]?.name;
 
             if (!generateUnchecked && name.includes('Unchecked')) {
@@ -475,6 +476,13 @@ export const ${typeDef.name}Schema = ${refineFuncName}(${noRefineSchema});
                     ? `.omit({ ${delegateDiscriminatorFields.map((f) => `${f.name}: true`).join(', ')} })`
                     : '';
 
+            const readonlyFields = model.fields.filter((field) => hasAttribute(field, '@readOnly'));
+
+            const omitReadonlyFields =
+                readonlyFields.length > 0
+                    ? `.omit({ ${readonlyFields.map((f) => `${f.name}: true`).join(', ')} })`
+                    : '';
+
             ////////////////////////////////////////////////
             // 1. Model schema
             ////////////////////////////////////////////////
@@ -536,7 +544,9 @@ export const ${upperCaseFirst(model.name)}Schema = ${modelSchema};
             ////////////////////////////////////////////////
 
             // schema for validating prisma create input (all fields optional)
-            let prismaCreateSchema = this.makePassthrough(this.makePartial(`baseSchema${omitDiscriminators}`));
+            let prismaCreateSchema = this.makePassthrough(
+                this.makePartial(`baseSchema${omitDiscriminators}${omitReadonlyFields}`)
+            );
             if (refineFuncName) {
                 prismaCreateSchema = `${refineFuncName}(${prismaCreateSchema})`;
             }
@@ -553,6 +563,7 @@ export const ${upperCaseFirst(model.name)}PrismaCreateSchema = ${prismaCreateSch
             let prismaUpdateSchema = `z.object({
                 ${scalarFields
                     .filter((f) => !isDiscriminatorField(f))
+                    .filter((f) => !hasAttribute(f, '@readOnly'))
                     .map((field) => {
                         let fieldSchema = makeFieldSchema(field);
                         if (field.type.type === 'Int' || field.type.type === 'Float') {
@@ -577,7 +588,7 @@ export const ${upperCaseFirst(model.name)}PrismaUpdateSchema = ${prismaUpdateSch
             // 3. Create schema
             ////////////////////////////////////////////////
 
-            let createSchema = `baseSchema${omitDiscriminators}`;
+            let createSchema = `baseSchema${omitDiscriminators}${omitReadonlyFields}`;
             const fieldsWithDefault = scalarFields.filter(
                 (field) => hasAttribute(field, '@default') || hasAttribute(field, '@updatedAt') || field.type.array
             );
@@ -631,7 +642,7 @@ export const ${upperCaseFirst(model.name)}CreateSchema = ${createSchema};
             ////////////////////////////////////////////////
 
             // for update all fields are optional
-            let updateSchema = this.makePartial(`baseSchema${omitDiscriminators}`);
+            let updateSchema = this.makePartial(`baseSchema${omitDiscriminators}${omitReadonlyFields}`);
 
             // export schema with only scalar fields: `[Model]UpdateScalarSchema`
             const updateScalarSchema = `${upperCaseFirst(model.name)}UpdateScalarSchema`;

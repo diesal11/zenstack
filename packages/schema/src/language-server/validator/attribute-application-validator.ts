@@ -174,6 +174,23 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         this.rejectEncryptedFields(attr, accept);
     }
 
+    @check('@readOnly')
+    private _checkReadOnly(attr: AttributeApplication, accept: ValidationAcceptor) {
+        const container = attr.$container;
+        const parentIsDataModel = isDataModelField(container);
+        if (!parentIsDataModel) {
+            accept('error', `attribute "@readOnly" can only be used on data model fields`, { node: attr });
+            return;
+        }
+
+        const hasDefault = hasAttribute(container, '@default');
+        if (!hasDefault) {
+            accept('error', `attribute "@readOnly" can only be used on fields with a @default attribute`, {
+                node: attr,
+            });
+        }
+    }
+
     @check('@@validate')
     private _checkValidate(attr: AttributeApplication, accept: ValidationAcceptor) {
         const condition = attr.args[0]?.value;

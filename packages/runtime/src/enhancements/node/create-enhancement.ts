@@ -17,11 +17,20 @@ import { withOmit } from './omit';
 import { withPassword } from './password';
 import { policyProcessIncludeRelationPayload, withPolicy } from './policy';
 import type { PolicyDef } from './types';
+import { withReadOnly } from './read-only';
 
 /**
  * All enhancement kinds
  */
-const ALL_ENHANCEMENTS: EnhancementKind[] = ['password', 'omit', 'policy', 'validation', 'delegate', 'encryption'];
+const ALL_ENHANCEMENTS: EnhancementKind[] = [
+    'password',
+    'omit',
+    'policy',
+    'validation',
+    'delegate',
+    'encryption',
+    'readOnly',
+];
 
 /**
  * Options for {@link createEnhancement}
@@ -103,6 +112,7 @@ export function createEnhancement<DbClient extends object>(
     const hasPassword = allFields.some((field) => field.attributes?.some((attr) => attr.name === '@password'));
     const hasEncrypted = allFields.some((field) => field.attributes?.some((attr) => attr.name === '@encrypted'));
     const hasOmit = allFields.some((field) => field.attributes?.some((attr) => attr.name === '@omit'));
+    const hasReadOnly = allFields.some((field) => field.attributes?.some((attr) => attr.name === '@readOnly'));
     const hasDefaultAuth = allFields.some((field) => field.defaultValueProvider);
     const hasTypeDefField = allFields.some((field) => field.isTypeDef);
 
@@ -164,6 +174,10 @@ export function createEnhancement<DbClient extends object>(
 
     if (hasTypeDefField) {
         result = withJsonProcessor(result, options);
+    }
+
+    if (hasReadOnly && kinds.includes('readOnly')) {
+        result = withReadOnly(result, options);
     }
 
     return result;
